@@ -1,10 +1,14 @@
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app import app, limiter
 
 client = TestClient(app)
 
+@pytest.fixture(autouse=True)
+def reset_rate_limit_storage():
+    limiter._storage.reset()
 
 def test_security_headers_on_root():
     response = client.get("/")
@@ -46,7 +50,7 @@ def test_missing_item_returns_404():
 
 
 def test_item_creation_rate_limit():
-    limiter._storage.reset()
+    
 
     payload = {
         "name": "Rate limit test",

@@ -64,3 +64,21 @@ def test_item_creation_rate_limit():
         for response in responses[:5]
     )
     assert responses[5].status_code == 429
+
+    def test_item_creation_logs_events(caplog):
+        import logging
+
+        caplog.set_level(logging.INFO, logger="secureapp")
+
+        payload = {
+            "name": "logging regression test",
+            "description": "this description should not appear in logs",
+            "price": 10.0,
+        }
+
+        response = client.post("/items", json=payload)
+
+        assert response.status_code == 201
+        assert "Item created: item_id=" in caplog.text
+        assert "this description should not appear in logs" not in caplog.text
+        

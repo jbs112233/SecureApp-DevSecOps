@@ -5,6 +5,7 @@ from app import app
 
 client = TestClient(app)
 
+from app import limiter
 
 def test_root_returns_application_status():
     response = client.get("/")
@@ -59,3 +60,40 @@ def test_missing_item_returns_404():
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Item not found"
+
+def test_security_headers_on_root():
+    response = client.get("/")
+    assert response.status_code == 200
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["referrer-policy"] == "no-referrer"
+    assert response.headers["permissions-policy"] == "camera=(), microphone=(), geolocation=()"
+
+
+def test_security_headers_on_health():
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY" 
+
+
+def test_item_creation_rate_limit():
+    limiter._storage.reset()
+
+    payload = {
+        "name": "Rate limit test",
+        "description": "Testing request limits",
+        "price": 10.0,
+    }
+
+    responses = [
+        client.post("/items", json=payload)
+        for _ in range(6)
+    ]
+
+    assert all(
+        response.status_code == 201
+        for response in responses[:5]
+    )
+    assert responses[5].status_code == 429

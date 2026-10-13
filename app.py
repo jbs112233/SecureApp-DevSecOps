@@ -1,6 +1,9 @@
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 
 app = FastAPI(
@@ -8,7 +11,27 @@ app = FastAPI(
     description="A learning project for secure software development.",
     version="0.1.0",
 )
+limiter = Limiter(key_func=get_remote_address)
 
+app.state.limiter = limiter
+app.add_exception_handler(
+    RateLimitExceeded,
+    _rate_limit_exceeded_handler,
+)
+
+
+@app.middleware("http")
+async def add_security_headers(request, call_next):
+    response = await call_next(request)
+
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Permissions-Policy"] = (
+        "camera=(), microphone=(), geolocation=()"
+    )
+
+    return response
 
 class ItemCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
@@ -35,7 +58,8 @@ def health_check():
 
 
 @app.post("/items", status_code=201)
-def create_item(item: ItemCreate):
+@limiter.limit("5/minute")
+def create_item(request: Request, item: ItemCreate):
     global next_item_id
 
     item_id = next_item_id

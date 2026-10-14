@@ -1,18 +1,45 @@
 
-from fastapi import FastAPI, HTTPException, Request
+import logging
+
+from contextlib import asynccontextmanager
+from fastapi import Depends, FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
+
+from database import Base, engine, get_db
+from models import Item
+from logging_config import configure_logging
+
+
+configure_logging()
+logger = logging.getLogger("secureapp")
+
+
+from alembic import command
+from alembic.config import Config
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    alembic_config = Config("alembic.ini")
+    command.upgrade(alembic_config, "head")
+
+    logger.info("SecureApp API started")
+    yield
+    logger.info("SecureApp API stopped")
 
 
 app = FastAPI(
     title="SecureApp API",
     description="A learning project for secure software development.",
     version="0.1.0",
+    lifespan=lifespan,
 )
-limiter = Limiter(key_func=get_remote_address)
 
+limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(
     RateLimitExceeded,
@@ -33,14 +60,11 @@ async def add_security_headers(request, call_next):
 
     return response
 
+
 class ItemCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     description: str = Field(default="", max_length=500)
     price: float = Field(gt=0, le=1_000_000)
-
-
-items: dict[int, dict] = {}
-next_item_id = 1
 
 
 @app.get("/")
@@ -59,21 +83,33 @@ def health_check():
 
 @app.post("/items", status_code=201)
 @limiter.limit("5/minute")
-def create_item(request: Request, item: ItemCreate):
-    global next_item_id
+def create_item(
+    request: Request,
+    item: ItemCreate,
+    db: Session = Depends(get_db),
+):
+    db_item = Item(**item.model_dump())
 
-    item_id = next_item_id
-    next_item_id += 1
+    db.add(db_item)
+    db.commit()
+    db.refresh(db_item)
 
-    item_data = item.model_dump()
-    items[item_id] = {"id": item_id, **item_data}
+    logger.info("Item created: item_id=%s", db_item.id)
 
-    return items[item_id]
+    return {
+        "id": db_item.id,
+        "name": db_item.name,
+        "description": db_item.description,
+        "price": db_item.price,
+    }
 
 
 @app.get("/items/{item_id}")
-def get_item(item_id: int):
-    item = items.get(item_id)
+def get_item(
+    item_id: int,
+    db: Session = Depends(get_db),
+):
+    item = db.get(Item, item_id)
 
     if item is None:
         raise HTTPException(
@@ -81,4 +117,9 @@ def get_item(item_id: int):
             detail="Item not found",
         )
 
-    return item
+    return {
+        "id": item.id,
+        "name": item.name,
+        "description": item.description,
+        "price": item.price,
+    }

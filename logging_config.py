@@ -15,5 +15,4 @@ def configure_logging() -> None:
             "%(name)s %(message)s"
         ),
         handlers=[logging.StreamHandler()],
-        force=True,
     )

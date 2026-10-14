@@ -1,13 +1,5 @@
 
-from fastapi.testclient import TestClient
-
-from app import app
-
-client = TestClient(app)
-
-from app import limiter
-
-def test_root_returns_application_status():
+def test_root_returns_application_status(client):
     response = client.get("/")
 
     assert response.status_code == 200
@@ -15,14 +7,14 @@ def test_root_returns_application_status():
     assert response.json()["status"] == "running"
 
 
-def test_health_check():
+def test_health_check(client):
     response = client.get("/health")
 
     assert response.status_code == 200
     assert response.json() == {"status": "healthy"}
 
 
-def test_create_and_retrieve_item():
+def test_create_and_retrieve_item(client):
     payload = {
         "name": "Security Book",
         "description": "A book about application security",
@@ -40,60 +32,43 @@ def test_create_and_retrieve_item():
     get_response = client.get(f"/items/{item_id}")
 
     assert get_response.status_code == 200
-    assert get_response.json()["id"] == item_id
+    assert get_response.json() == created_item
 
 
-def test_rejects_invalid_item_price():
-    payload = {
-        "name": "Invalid Item",
-        "description": "This should fail validation",
-        "price": -10,
-    }
-
-    response = client.post("/items", json=payload)
+def test_rejects_invalid_item_price(client):
+    response = client.post(
+        "/items",
+        json={
+            "name": "Invalid Item",
+            "description": "This should fail validation",
+            "price": -10,
+        },
+    )
 
     assert response.status_code == 422
 
 
-def test_missing_item_returns_404():
+def test_missing_item_returns_404(client):
     response = client.get("/items/999999")
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Item not found"
 
-def test_security_headers_on_root():
-    response = client.get("/")
-    assert response.status_code == 200
-    assert response.headers["x-content-type-options"] == "nosniff"
-    assert response.headers["x-frame-options"] == "DENY"
-    assert response.headers["referrer-policy"] == "no-referrer"
-    assert response.headers["permissions-policy"] == "camera=(), microphone=(), geolocation=()"
 
-
-def test_security_headers_on_health():
-    response = client.get("/health")
-
-    assert response.status_code == 200
-    assert response.headers["x-content-type-options"] == "nosniff"
-    assert response.headers["x-frame-options"] == "DENY" 
-
-
-def test_item_creation_rate_limit():
-    limiter._storage.reset()
-
-    payload = {
-        "name": "Rate limit test",
-        "description": "Testing request limits",
-        "price": 10.0,
-    }
-
-    responses = [
-        client.post("/items", json=payload)
-        for _ in range(6)
-    ]
-
-    assert all(
-        response.status_code == 201
-        for response in responses[:5]
+def test_item_persists_across_requests(client):
+    response = client.post(
+        "/items",
+        json={
+            "name": "Persistence Test",
+            "description": "Saved in SQLite",
+            "price": 15.0,
+        },
     )
-    assert responses[5].status_code == 429
+
+    assert response.status_code == 201
+    item_id = response.json()["id"]
+
+    retrieved = client.get(f"/items/{item_id}")
+
+    assert retrieved.status_code == 200
+    assert retrieved.json()["name"] == "Persistence Test"

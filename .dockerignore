@@ -7,3 +7,7 @@ __pycache__/
 .env.*
 !.env.example
 pip-audit-report.json
+*.db
+*.db-shm
+*.db-wal
+app.py.backup

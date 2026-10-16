@@ -1,11 +1,10 @@
 
-import os
 from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from database import Base
+from database import Base, DATABASE_URL
 import models
 
 config = context.config
@@ -15,12 +14,10 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
-database_url = os.getenv("SECUREAPP_DATABASE_URL")
-if database_url:
-    config.set_main_option(
-        "sqlalchemy.url",
-        database_url.replace("%", "%%"),
-    )
+config.set_main_option(
+    "sqlalchemy.url",
+    DATABASE_URL.replace("%", "%%"),
+)
 
 
 def run_migrations_offline() -> None:

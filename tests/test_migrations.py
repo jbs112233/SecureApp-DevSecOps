@@ -161,3 +161,59 @@ def test_item_ownership_migration_can_downgrade_and_upgrade(tmp_path):
         assert "owner_id" in columns
     finally:
         engine.dispose()
+
+        
+def test_ownership_migration_preserves_legacy_items_without_owner(tmp_path):
+    database_path = tmp_path / "legacy_items.db"
+    database_url = f"sqlite:///{database_path.as_posix()}"
+
+    result = run_alembic(database_url, "upgrade", "ab148143cd93")
+    assert result.returncode == 0, result.stdout + result.stderr
+
+    engine = create_engine(database_url)
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    """
+                    INSERT INTO items (name, description, price)
+                    VALUES (:name, :description, :price)
+                    """
+                ),
+                {
+                    "name": "Legacy item",
+                    "description": "Created before ownership existed",
+                    "price": 12.50,
+                },
+            )
+    finally:
+        engine.dispose()
+
+    # Apply the ownership migration.
+    result = run_alembic(database_url, "upgrade", "head")
+    assert result.returncode == 0, result.stdout + result.stderr
+
+    # Confirm the item survives and remains explicitly unowned.
+    engine = create_engine(database_url)
+    try:
+        with engine.connect() as connection:
+            item = connection.execute(
+                text(
+                    """
+                    SELECT name, description, price, owner_id
+                    FROM items
+                    WHERE name = :name
+                    """
+                ),
+                {"name": "Legacy item"},
+            ).one_or_none()
+
+        assert item is not None
+        assert item.name == "Legacy item"
+        assert item.description == "Created before ownership existed"
+        assert item.price == 12.50
+        assert item.owner_id is None
+    finally:
+        engine.dispose()
+
+

@@ -80,3 +80,29 @@ def test_secret_key_with_minimum_length_is_accepted(monkeypatch):
     reloaded_config = importlib.reload(config)
 
     assert reloaded_config.SECRET_KEY == "a" * 32
+
+def test_item_rate_limit_can_be_overridden(monkeypatch):
+    monkeypatch.setenv("SECUREAPP_SECRET_KEY", "a" * 32)
+    monkeypatch.setenv("SECUREAPP_ITEM_RATE_LIMIT", "8/minute")
+
+    reloaded_config = importlib.reload(config)
+
+    assert reloaded_config.ITEM_RATE_LIMIT == "8/minute"
+
+
+def test_register_rate_limit_can_be_overridden(monkeypatch):
+    monkeypatch.setenv("SECUREAPP_SECRET_KEY", "a" * 32)
+    monkeypatch.setenv("SECUREAPP_REGISTER_RATE_LIMIT", "3/minute")
+
+    reloaded_config = importlib.reload(config)
+
+    assert reloaded_config.REGISTER_RATE_LIMIT == "3/minute"
+
+
+def test_login_rate_limit_can_be_overridden(monkeypatch):
+    monkeypatch.setenv("SECUREAPP_SECRET_KEY", "a" * 32)
+    monkeypatch.setenv("SECUREAPP_LOGIN_RATE_LIMIT", "2/minute")
+
+    reloaded_config = importlib.reload(config)
+
+    assert reloaded_config.LOGIN_RATE_LIMIT == "2/minute"

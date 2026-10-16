@@ -59,3 +59,24 @@ def test_short_secret_key_is_rejected(monkeypatch):
         match="must contain at least 32 characters",
     ):
         importlib.reload(config)
+
+
+def test_missing_secret_key_is_rejected(monkeypatch):
+    monkeypatch.setenv("SECUREAPP_SECRET_KEY", "")
+    monkeypatch.setenv("SECUREAPP_ACCESS_TOKEN_MINUTES", "30")
+
+    with pytest.raises(
+        RuntimeError,
+        match="must contain at least 32 characters",
+    ):
+        importlib.reload(config)
+
+
+
+def test_secret_key_with_minimum_length_is_accepted(monkeypatch):
+    monkeypatch.setenv("SECUREAPP_SECRET_KEY", "a" * 32)
+    monkeypatch.setenv("SECUREAPP_ACCESS_TOKEN_MINUTES", "30")
+
+    reloaded_config = importlib.reload(config)
+
+    assert reloaded_config.SECRET_KEY == "a" * 32

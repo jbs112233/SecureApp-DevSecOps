@@ -38,11 +38,10 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip install bandit==1.9.4 pip-audit==2.10.1
 
-
       - name: Run automated tests
+        env:
+          SECUREAPP_SECRET_KEY: ci-only-test-secret-key-not-for-production-12345
         run: python -m pytest -v
-
-
 
       - name: Run Bandit
         run: >-

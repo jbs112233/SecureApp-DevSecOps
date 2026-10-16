@@ -133,3 +133,35 @@ def test_item_persists_across_requests(client):
 
     assert retrieved.status_code == 200
     assert retrieved.json()["name"] == "Persistence Test"
+
+
+def test_denied_cross_user_access_does_not_affect_owner_item(client):
+    owner_headers = register_and_login(client, "isolationowner")
+    other_headers = register_and_login(client, "isolationother")
+
+    create_response = client.post(
+        "/items",
+        json={
+            "name": "Owner's Private Item",
+            "description": "Must remain accessible to its owner",
+            "price": 42.0,
+        },
+        headers=owner_headers,
+    )
+    assert create_response.status_code == 201
+
+    item_id = create_response.json()["id"]
+
+    denied_response = client.get(
+        f"/items/{item_id}",
+        headers=other_headers,
+    )
+    assert denied_response.status_code == 404
+
+    owner_response = client.get(
+        f"/items/{item_id}",
+        headers=owner_headers,
+    )
+    assert owner_response.status_code == 200
+    assert owner_response.json()["id"] == item_id
+    assert owner_response.json()["name"] == "Owner's Private Item"

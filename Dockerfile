@@ -13,7 +13,7 @@ COPY requirements.txt .
 
 RUN python -m pip install --no-cache-dir -r requirements.txt
 
-COPY app.py config.py logging_config.py database.py models.py ./
+COPY app.py auth.py auth_routes.py config.py logging_config.py database.py models.py rate_limiter.py ./
 COPY alembic.ini ./
 COPY migrations/ ./migrations/
 

@@ -1,8 +1,5 @@
 import logging
-from contextlib import asynccontextmanager
 
-from alembic import command
-from alembic.config import Config
 from fastapi import Depends, FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -20,21 +17,10 @@ from rate_limiter import limiter
 configure_logging()
 logger = logging.getLogger("secureapp")
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    alembic_config = Config("alembic.ini")
-    command.upgrade(alembic_config, "head")
-    logger.info("SecureApp API started")
-    yield
-    logger.info("SecureApp API stopped")
-
-
 app = FastAPI(
     title="SecureApp API",
     description="A project where I dive into secure software development.",
     version="0.1.0",
-    lifespan=lifespan,
 )
 
 app.include_router(auth_router)

@@ -250,3 +250,40 @@ def test_login_rate_limit(client):
     ), [response.status_code for response in responses]
 
     assert responses[5].status_code == 429
+
+    
+def test_inactive_user_cannot_login(client):
+    password = "a-strong-test-password-123"
+
+    registration = client.post(
+        "/auth/register",
+        json={
+            "username": "inactive_login01",
+            "password": password,
+        },
+    )
+    assert registration.status_code == 201
+
+    user_id = registration.json()["id"]
+
+    db_generator = client.app.dependency_overrides[get_db]()
+    db = next(db_generator)
+    try:
+        user = db.scalar(select(User).where(User.id == user_id))
+        assert user is not None
+        user.is_active = False
+        db.commit()
+    finally:
+        db_generator.close()
+
+    response = client.post(
+        "/auth/token",
+        json={
+            "username": "inactive_login01",
+            "password": password,
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Account is inactive"
+

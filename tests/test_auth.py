@@ -226,3 +226,27 @@ def test_registration_rejects_invalid_username(client):
     )
 
     assert response.status_code == 422
+
+
+def test_login_rate_limit(client):
+    from auth_routes import limiter
+
+    limiter._storage.reset()
+
+    responses = [
+        client.post(
+            "/auth/token",
+            json={
+                "username": "ratelimituser",
+                "password": "incorrect-password-123",
+            },
+        )
+        for _ in range(6)
+    ]
+
+    assert all(
+        response.status_code == 401
+        for response in responses[:5]
+    ), [response.status_code for response in responses]
+
+    assert responses[5].status_code == 429

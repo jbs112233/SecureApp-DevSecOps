@@ -165,3 +165,15 @@ def test_denied_cross_user_access_does_not_affect_owner_item(client):
     assert owner_response.status_code == 200
     assert owner_response.json()["id"] == item_id
     assert owner_response.json()["name"] == "Owner's Private Item"
+
+    
+def test_item_endpoint_rejects_non_numeric_id(client):
+    headers = register_and_login(client, "invaliditemid")
+
+    response = client.get(
+        "/items/not-a-number",
+        headers=headers,
+    )
+
+    assert response.status_code == 422
+

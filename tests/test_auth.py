@@ -320,3 +320,27 @@ def test_login_errors_do_not_reveal_username_existence(client):
     assert unknown_username.status_code == 401
     assert wrong_password.json()["detail"] == "Invalid username or password"
     assert unknown_username.json()["detail"] == "Invalid username or password"
+
+    
+
+def test_register_rejects_username_duplicate_after_normalization(client):
+    first_response = client.post(
+        "/auth/register",
+        json={
+            "username": "AliceTest01",
+            "password": "a-strong-test-password-123",
+        },
+    )
+
+    second_response = client.post(
+        "/auth/register",
+        json={
+            "username": "alicetest01",
+            "password": "a-strong-test-password-456",
+        },
+    )
+
+    assert first_response.status_code == 201
+    assert first_response.json()["username"] == "alicetest01"
+    assert second_response.status_code == 409
+    assert second_response.json()["detail"] == "Username is already registered"

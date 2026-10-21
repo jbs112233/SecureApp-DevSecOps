@@ -287,3 +287,36 @@ def test_inactive_user_cannot_login(client):
     assert response.status_code == 403
     assert response.json()["detail"] == "Account is inactive"
 
+def test_login_errors_do_not_reveal_username_existence(client):
+    existing_username = "genericerror01"
+    password = "a-strong-test-password-123"
+
+    registration = client.post(
+        "/auth/register",
+        json={
+            "username": existing_username,
+            "password": password,
+        },
+    )
+    assert registration.status_code == 201
+
+    wrong_password = client.post(
+        "/auth/token",
+        json={
+            "username": existing_username,
+            "password": "incorrect-password-123",
+        },
+    )
+
+    unknown_username = client.post(
+        "/auth/token",
+        json={
+            "username": "unknownuser01",
+            "password": password,
+        },
+    )
+
+    assert wrong_password.status_code == 401
+    assert unknown_username.status_code == 401
+    assert wrong_password.json()["detail"] == "Invalid username or password"
+    assert unknown_username.json()["detail"] == "Invalid username or password"

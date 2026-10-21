@@ -362,3 +362,27 @@ def test_token_with_nonnumeric_subject_is_rejected(client):
     assert response.status_code == 401
     assert response.json()["detail"] == "Invalid or expired token"
 
+def test_token_missing_subject_is_rejected(client):
+    import jwt
+
+    from auth import ALGORITHM, SECRET_KEY
+    from datetime import datetime, timedelta, timezone
+
+    now = datetime.now(timezone.utc)
+    token = jwt.encode(
+        {
+            "role": "user",
+            "iat": now,
+            "exp": now + timedelta(minutes=5),
+        },
+        SECRET_KEY,
+        algorithm=ALGORITHM,
+    )
+
+    response = client.get(
+        "/auth/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid or expired token"

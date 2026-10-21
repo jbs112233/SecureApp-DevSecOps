@@ -344,3 +344,45 @@ def test_register_rejects_username_duplicate_after_normalization(client):
     assert first_response.json()["username"] == "alicetest01"
     assert second_response.status_code == 409
     assert second_response.json()["detail"] == "Username is already registered"
+
+    
+def test_token_with_nonnumeric_subject_is_rejected(client):
+    from auth import create_access_token
+
+    token = create_access_token(
+        subject="not-a-user-id",
+        role="user",
+    )
+
+    response = client.get(
+        "/auth/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid or expired token"
+
+def test_token_missing_subject_is_rejected(client):
+    import jwt
+
+    from auth import ALGORITHM, SECRET_KEY
+    from datetime import datetime, timedelta, timezone
+
+    now = datetime.now(timezone.utc)
+    token = jwt.encode(
+        {
+            "role": "user",
+            "iat": now,
+            "exp": now + timedelta(minutes=5),
+        },
+        SECRET_KEY,
+        algorithm=ALGORITHM,
+    )
+
+    response = client.get(
+        "/auth/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid or expired token"
